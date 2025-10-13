@@ -67,4 +67,5 @@ class sequenceToSequence(nn.module):
 
 # for seq in testTensors:
 #     wordFromSequence = "".join([indexToChar[i.item()] for i in seq if i.item() != 0])
+
 #     print("Recovered word:", wordFromSequence)
