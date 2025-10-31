@@ -66,8 +66,8 @@ class sequenceToSequence(nn.Module):
         predictions = self.fc(outputs)
         return predictions
     
-embedding_dim = 64
-hidden_dim = 128
+embedding_dim = 128
+hidden_dim = 256
 
 model = sequenceToSequence(vocabSize, embedding_dim, hidden_dim)
 criteria = nn.CrossEntropyLoss(ignore_index=0)
@@ -105,7 +105,7 @@ def correctWord(word):
         output = model(input_tensor, input_tensor)
 
     predictionI = output.argmax(2).squeeze().tolist()
-
+    
     predicted_word = ""
     for i in predictionI: 
         if i == charToIndex["<EOS>"]:
@@ -122,5 +122,5 @@ for w in testWord:
 
 
 #save
-torch.save(model.state_dict(), "telugu_autocorrect2.pth")
-print("model saved as telugu_autocorrect2.pth")
+torch.save(model.state_dict(), "telugu_autocorrect3.pth")
+print("model saved as telugu_autocorrect3.pth")
