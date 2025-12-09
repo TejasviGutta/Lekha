@@ -23,9 +23,9 @@ if not os.path.exists(UserDataFile):
 
 with open(UserDataFile, "r", encoding = "utf-8") as f:
     for line in f:
-        line - line.strip()
+        line = line.strip()
         if line:
-            worng, right = line.split()
+            wrong, right = line.split()
             userDict[wrong]= right
 
 
@@ -203,19 +203,14 @@ def beamSearchDecode(model, seq, beamWidth = 3, maxLen = None):
                 
         return decoded
 
-
-
 # testing
-#model.eval()
-
-def correctWord(word, maxDecodeLen=None, autoLearn = True):
+def correctWord(word, maxDecodeLen=None):
     if word in userDict:
         return userDict[word]
     
     if word in word_dict:
         return word_dict[word]
     
-    model.eval()
     seq = wordToSequenceInput(word, maxLenInput)
     input_tensor = torch.tensor([seq], dtype=torch.long)
 
@@ -239,27 +234,7 @@ def correctWord(word, maxDecodeLen=None, autoLearn = True):
             if predIndex not in [charToIndex["<PAD>"], charToIndex["<SOS>"]]:
                 predictedWord += indexToChar[predIndex]
             decoderInput = torch.tensor([[predIndex]], dtype=torch.long)
-    if autoLearn:
-        print(f"\nModel prediction: '{predictedWord}' for '{word}'")
-        user_input = input(f"Is this correct? (press Enter if yes, or type correct word):").strip()
-        if user_input: 
-            correctForm = user_input
-        else:
-            correctForm = predictedWord
-        with open(UserDataFile, "a", encoding= "utf-8") as f:
-            f.write(f"{word} {correctForm}\n")
-        userDict[word] = correctForm
-        print(f"Saved correction: {word} -> {correctForm}")
+    return predictedWord
 
-        if len(userDict) %50 == 0:
-            fine_tune_on_user_data()
-
-
-testWord = ["ella", "unavu", "emthi", "perru", "baagunnanu"]
-for w in testWord:
-    print(w, "->", correctWord(w))
-
-
-#save
-torch.save(model.state_dict(), "telugu_autocorrect9.pth")
-print("model saved as telugu_autocorrect9.pth")
+if __name__ == "__main__":
+    print("Modle loaded. Used by backend.")
