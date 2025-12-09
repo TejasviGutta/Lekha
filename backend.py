@@ -1,38 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import torch
+import main
 
-from main import correctWord, model
-app = FastAPI()
+app = FastAPI(title= "Lekh.AI Backend")
 
-UserFolder = "userdata"
-os.makdirs(UserFolder, exist_ok= True)
+class CorrectRequest(BaseModel):
+    word:str
 
-from main import sequenceToSequence, correctWord, charToIndex, indexToChar, wordToSequenceInput, wordToSequenceOutput, maxLenInput, maxLenOutput
+class CorrectResponse(BaseModel):
+    original: str
+    corrected: str
 
-model = sequenceToSequence((len(charToIndex), 128, 256))
-model.load_state_dict(torch.load("telugu_autocorrect8.pth", map_location= "cpu"))
-model.eval()
+@app.post("/correct", response_model=CorrectResponse)
 
-
-## need to do request of body ###
-##PHONE COMES FROM REQUEST OF BODY!!!
-
-def loadUserDict(phone):
-    path = f"{UserFolder}/{phone}.json"
-
-    if not os.path.exists(path):
-        with open(path, "w") as f:
-            json.dump({}, f)
-        return {}
-    with open(path, "r") as f:
-        return json.load(f)
+def correctWord(req: CorrectRequest):
+    word = req.word.strip()
+    if not word:
+        raise HTTPException(status_code = 400, detail="word cannot be empty")
     
-def saveUserDict(phone, data):
-    path = f"{UserFolder}/{phone}.json"
-    with open(path, "w") as f: 
-        json.dump(data, f, indent=4)
+    corrected = main.correctWord(word)
 
-def predWord(req: PredictionRequest):
-    
-    
+    if word not in main.userDict:
+        main.userDict[word] = corrected
+        with open(main.UserDataFile, "a", encoding="utf-8") as f:
+            f.write(f"{word} {corrected}\n")
+        if len(main.userDict) % 50 == 0:
+            main.fine_tune_on_user_data()
+    return CorrectResponse(original=word, corrected=corrected)
+@app.get("/")
+def root():
+    return{"message": "Lekh.AI backend run"}
