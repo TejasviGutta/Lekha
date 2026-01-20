@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import os
+import difflib
 
 #reading text file
 words = []
@@ -15,7 +16,6 @@ with open("training_balanced.txt", "r", encoding="utf-8") as f:
             words.append((wrong, right))
             word_dict[wrong] = right
 
-##### YOU NEED TO COMPLETE THIS!!!!!!
 UserDataFile = "userData.txt"
 userDict = {}
 if not os.path.exists(UserDataFile):
@@ -38,24 +38,26 @@ for wrong, correct in words:
 # mappings
 charToIndex = {c: i+1 for i, c in enumerate(sorted(chars))}
 #padding token
-charToIndex["<PAD>"] = 0
-charToIndex["<SOS>"] = 1
-charToIndex["<EOS>"] = 2
+charToIndex = {
+    "<PAD>" : 0,
+    "<SOS>" : 1,
+    "<EOS>" : 2,
+    "<UNK>" : 3
+}
 
-idx = 3
+idx = 4
 for c in sorted(chars):
     charToIndex[c] = idx
     idx+=1
 
 indexToChar = {i:c for c, i in charToIndex.items()}
-vocabSize = len(charToIndex) + 1
 
 #set vocab size:
 vocabSize = len(charToIndex); 
 
 # converting words to sequences
 def wordToSequenceInput(word, max_len):
-    sequence = [charToIndex[c] for c in word]
+    sequence = [charToIndex.get(c, charToIndex["<UNK>"])for c in word]
     sequence += [charToIndex["<PAD>"]] * (max_len - len(sequence))
     return sequence
 
@@ -113,6 +115,9 @@ criteria = nn.CrossEntropyLoss(ignore_index=charToIndex["<PAD>"])
 optimize = torch.optim.Adam(model.parameters(), lr = 0.001)
 
 def fine_tune_on_user_data():
+    if not os.path.exists(UserDataFile):
+        return
+    
     user_words = []
     with open(UserDataFile, "r", encoding = "utf-8") as f:
         for line in f:
@@ -121,11 +126,21 @@ def fine_tune_on_user_data():
 
     if not user_words:
         return
+    
+    if os.path.exists(BASE_MODEL_PATH):
+        model.load_state_dict(torch.load(BASE_MODEL_PATH))
+
+    for param in model.encoder.parameters():
+        param.requires_grad = False
+    for param in model.embedding.parameters():
+        param.requires_grad = False
+
     userInputs = torch.tensor([wordToSequenceInput(wrong, maxLenInput) for wrong, _ in user_words], dtype=torch.long)
     userTargets = torch.tensor([wordToSequenceOutput(correct, maxLenOutput) for _, correct in user_words], dtype=torch.long)
-    optimize = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimize = torch.optim.Adam(filter(lambda a: a.requires_grad, model.parameters()), lr = 0.00001)
     criteria = nn.CrossEntropyLoss(ignore_index=charToIndex["<PAD>"])
-    for epoch in range(10):
+
+    for epoch in range(7):
         model.train()
         optimize.zero_grad()
         decoderInput = userTargets[:, :-1]
@@ -136,31 +151,46 @@ def fine_tune_on_user_data():
         optimize.step()
     torch.save(model.state_dict(), "telugu_autocorrect_user.pth")
 
+BASE_MODEL_PATH = "telugu_autocorrect_base.pth"
+USER_MODEL_PATH = "telugu_autocorrect_user.pth"
+
+if os.path.exists(USER_MODEL_PATH):
+    model.load_state_dict(torch.load(USER_MODEL_PATH))
+    skip = True
+elif os.path.exists(BASE_MODEL_PATH):
+    model.load_state_dict(torch.load(BASE_MODEL_PATH))
+    skip = True
+else:
+    skip = False
+
 #training
-num = 100
-batch_size = 16
-dataset_size = len(inputs)
+if not skip:
+    num = 100
+    batch_size = 16
+    dataset_size = len(inputs)
 
-for epoch in range(num):
-    model.train()
-    permutation = torch.randperm(dataset_size)
+    for epoch in range(num):
+        model.train()
+        permutation = torch.randperm(dataset_size)
 
-    for i in range (0, dataset_size, batch_size):
-        optimize.zero_grad()
-        indicies = permutation[i:i+batch_size]
-        batchInputs = inputs[indicies]
-        batchTargets = targets[indicies]
+        for i in range (0, dataset_size, batch_size):
+            optimize.zero_grad()
+            indicies = permutation[i:i+batch_size]
+            batchInputs = inputs[indicies]
+            batchTargets = targets[indicies]
 
-        output = model(batchInputs, batchTargets)
-        output = output.view(-1, vocabSize)
-        targetsF = batchTargets.contiguous().view(-1)
+            decoderInput = batchTargets[:, :-1]
+            decoderTarget = batchTargets[:, 1:]
 
-        loss = criteria(output, targetsF)
-        loss.backward()
-        optimize.step()
+            output = model(batchInputs, decoderInput)
+            loss = criteria(output.view(-1, vocabSize), decoderTarget.contiguous().view(-1))
 
-    if(epoch+1)%10 == 0:
-        print(f"Epoch [{epoch + 1}/ {num}], Loss: {loss.item():.4f}")
+            loss.backward()
+            optimize.step()
+
+        if(epoch+1)%10 == 0:
+            print(f"Epoch [{epoch + 1}/ {num}], Loss: {loss.item():.4f}")
+    torch.save(model.state_dict(), BASE_MODEL_PATH)
 
 
 def beamSearchDecode(model, seq, beamWidth = 3, maxLen = None):
@@ -202,8 +232,12 @@ def beamSearchDecode(model, seq, beamWidth = 3, maxLen = None):
                 decoded += indexToChar[idx]
                 
         return decoded
+    
+def similarity(prediction, input):
+    return difflib.SequenceMatcher(None, prediction, input).ratio()
 
 # testing
+
 def correctWord(word, maxDecodeLen=None):
     if word in userDict:
         return userDict[word]
@@ -212,29 +246,20 @@ def correctWord(word, maxDecodeLen=None):
         return word_dict[word]
     
     seq = wordToSequenceInput(word, maxLenInput)
-    input_tensor = torch.tensor([seq], dtype=torch.long)
 
-    if maxDecodeLen is None:
-        maxDecodeLen = maxLenOutput
+    predictedWord = beamSearchDecode(model, seq, beamWidth=5); 
+    if similarity(predictedWord, word)>=0.6:
+        return predictedWord
     
-    predictedWord = "" 
-    with torch.no_grad():
-        _, (hidden, cell) = model.encoder(model.embedding(input_tensor))
-        decoderInput = torch.tensor([[charToIndex["<SOS>"]]], dtype=torch.long)
-        predictedWord=""
-
-        for _ in range(maxDecodeLen):
-            emb = model.embedding(decoderInput)
-            output, (hidden, cell) = model.decoder(emb, (hidden, cell))
-            logit = model.fc(output[:, -1, :])
-            predIndex = int(torch.argmax(logit, dim=1).item())
-
-            if predIndex == charToIndex["<EOS>"]:
-                break
-            if predIndex not in [charToIndex["<PAD>"], charToIndex["<SOS>"]]:
-                predictedWord += indexToChar[predIndex]
-            decoderInput = torch.tensor([[predIndex]], dtype=torch.long)
-    return predictedWord
+    return word
 
 if __name__ == "__main__":
-    print("Modle loaded. Used by backend.")
+    print("Model loaded. Used by backend.\n")
+    while True:
+        word = input("Enter word: ").strip()
+        if word.lower() == "exit":
+            break
+        corrected = correctWord(word)
+        print("->", corrected, "\n")
+        #print("User dict: ", userDict, "\n")
+        print("word: ", repr(word), "\n")

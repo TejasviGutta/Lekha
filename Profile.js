@@ -1,7 +1,39 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { correctWord, confirmCorrection } from "../api";
+
 
 export default function Profile({ navigation, route }) {
+
+  const [inputWord, setInputWord] = useState(""); 
+  const[result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleCorrect = async () => {
+  if (!inputWord.trim()) return;
+
+  try {
+    setLoading(true);
+    const response = await correctWord(inputWord);
+    setResult(response);
+  } catch (err) {
+    Alert.alert("Error", "Failed to connect to AI backend");
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const handleConfirm = async () => {
+  if (!result) return;
+    try {
+        await confirmCorrection(result.original, result.corrected);
+        Alert.alert("Saved", "Correction learned successfully");
+    } catch {
+        Alert.alert("Error", "Failed to save correction");
+    }
+ };
+
+
   const firstName = route?.params?.firstName || 'User';
 
   const handleDeleteAccount = () => {
@@ -67,6 +99,32 @@ export default function Profile({ navigation, route }) {
 
   return (
     <View style={styles.container}>
+      <TextInput
+  style={styles.input}
+  placeholder="Enter word"
+  placeholderTextColor="#888"
+  value={inputWord}
+  onChangeText={setInputWord}
+/>
+
+<TouchableOpacity style={styles.primaryButton} onPress={handleCorrect}>
+  <Text style={styles.primaryText}>
+    {loading ? "Thinking..." : "Correct Word"}
+  </Text>
+</TouchableOpacity>
+
+{result && (
+  <>
+    <Text style={styles.infoText}>
+      Corrected: {result.corrected}
+    </Text>
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={handleConfirm}>
+        <Text style={styles.secondaryText}>Confirm Correction</Text>
+      </TouchableOpacity>
+  </>
+)}
+
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
         <Text style={styles.backText}>{'<'}</Text>
       </TouchableOpacity>
@@ -114,4 +172,14 @@ const styles = StyleSheet.create({
 
   destructiveButton: { marginTop: 12, alignItems: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: '#ff4d4d' },
   destructiveText: { fontSize: 18, fontWeight: '700', color: '#000' },
+  input: {
+  marginTop: 12,
+  padding: 10,
+  borderRadius: 8,
+  backgroundColor: "#000",
+  color: "#f5f5f5",
+  borderWidth: 1,
+  borderColor: "#00ffff",
+}
+
 });

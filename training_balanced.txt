@@ -370,7 +370,7 @@ ppilichanu pilichanu
 abgunnanu bagunnanu
 endhuku endhuku
 nuvvu nuvvu
-monna monna
+monna mona
 ayina ayina
 naaku naaku
 pilichanuu pilichanu
@@ -653,3 +653,4 @@ hello hello
 helo hello
 heello hello
 hii hi
+he hi
