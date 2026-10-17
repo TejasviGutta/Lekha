@@ -95,15 +95,16 @@ class sequenceToSequence(nn.Module):
         _, (hidden, cell) = self.encoder((embeddedSrc))
         decoder_input = target[:, 0].unsqueeze(1)
         
-        for t in range(1, seqlen):
+        for t in range(seqlen):
             embedded = self.embedding(decoder_input)
-            output, (hidden,cell) = self.decoder(embedded, (hidden, cell))
+            output, (hidden, cell) = self.decoder(embedded, (hidden, cell))
             prediction = self.fc(output)
             outputs[:, t, :] = prediction.squeeze(1)
 
-            teacherForce = random.random() < teacher_forcing_ratio
-            top1 = prediction.argmax(2)
-            decoder_input = (target[:, t].unsqueeze(1) if teacherForce else top1)
+            if t + 1 < seqlen:
+                teacherForce = random.random() < teacher_forcing_ratio
+                top1 = prediction.argmax(2)
+                decoder_input = target[:, t + 1].unsqueeze(1) if teacherForce else top1
         return outputs
         
     

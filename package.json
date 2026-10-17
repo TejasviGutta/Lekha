@@ -1,0 +1,23 @@
+{
+  "name": "lekha",
+  "version": "1.0.0",
+  "description": "**AI-powered autocorrect for Telugu written using English letters.**",
+  "main": "api.js",
+  "scripts": {
+  "dev": "concurrently -k \"python -m uvicorn backend:app --reload\" \"npx expo start\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TejasviGutta/Lekha.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TejasviGutta/Lekha/issues"
+  },
+  "homepage": "https://github.com/TejasviGutta/Lekha#readme",
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
