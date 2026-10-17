@@ -1,0 +1,16 @@
+Merges applied:
+
+Conflict handling:
+  NOISY pair dropped: aalla -> ala (x1)
+  NOISY pair dropped: bannay -> bane (x1)
+  NOISY pair dropped: iilla -> ila (x1)
+  NOISY pair dropped: rreeppuu -> repu (x1)
+  NOISY pair dropped: uunnaannuu -> unanu (x1)
+  valid word 'baagunnanu' also mapped to {'bagunnanu': 1} -> dropped
+  valid word 'ikada' also mapped to {'ikkada': 1} -> dropped
+  valid word 'ikkada' also mapped to {'ikada': 1} -> dropped
+  valid word 'padukunannu' also mapped to {'padukunnanu': 1} -> dropped
+  valid word 'velaru' also mapped to {'vellaru': 1} -> dropped
+  valid word 'vellaru' also mapped to {'velaru': 1} -> dropped
+  valid word 'vishayam' also mapped to {'vishyam': 1} -> dropped
+  valid word 'vishyam' also mapped to {'vishayam': 1} -> dropped

@@ -52,14 +52,46 @@ def load_merges(path):
     return merges
 
 
-def resolve(pairs, merges, majority):
+def edit_distance(s, t):
+    """Optimal string alignment distance (a swap of neighbours costs 1)."""
+    d = [[0] * (len(t) + 1) for _ in range(len(s) + 1)]
+    for i in range(len(s) + 1):
+        d[i][0] = i
+    for j in range(len(t) + 1):
+        d[0][j] = j
+    for i in range(1, len(s) + 1):
+        for j in range(1, len(t) + 1):
+            cost = 0 if s[i - 1] == t[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and s[i - 1] == t[j - 2] and s[i - 2] == t[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[len(s)][len(t)]
+
+
+def is_noisy(wrong, right, max_rel):
+    """A typo should look like its target. Short words may differ by 1 letter."""
+    dist = edit_distance(wrong, right)
+    if len(right) <= 3:
+        return dist >= 2
+    return dist / max(len(wrong), len(right)) >= max_rel
+
+
+def resolve(pairs, merges, majority, max_rel=0.5):
     """Return {input: target} with conflicts removed, plus report lines."""
     report = []
     counts = collections.defaultdict(collections.Counter)
+    noisy = collections.Counter()
     for wrong, right in pairs:
-        counts[wrong][merges.get(right, right)] += 1
+        right = merges.get(right, right)
+        if wrong != right and is_noisy(wrong, right, max_rel):
+            noisy[(wrong, right)] += 1
+            continue
+        counts[wrong][right] += 1
+    for (wrong, right), n in sorted(noisy.items()):
+        report.append(f"NOISY pair dropped: {wrong} -> {right} (x{n})")
 
     canon = {merges.get(r, r) for _, r in pairs} | set(merges.values())
+    # a canonical word whose only evidence was dropped is still a real word
     resolved = {}
     for wrong in sorted(counts):
         c = counts[wrong]
@@ -140,6 +172,8 @@ def main():
     ap.add_argument("--variants", type=int, default=12, help="synthetic typos per word")
     ap.add_argument("--min-aug-len", type=int, default=4)
     ap.add_argument("--majority", type=float, default=0.8)
+    ap.add_argument("--max-rel-dist", type=float, default=0.5,
+                    help="drop pairs whose edit distance / length is at least this")
     ap.add_argument("--seed", type=int, default=13)
     a = ap.parse_args()
     rng = random.Random(a.seed)
@@ -147,7 +181,7 @@ def main():
 
     pairs = load_pairs(a.data, a.files)
     merges = load_merges(a.merges)
-    resolved, canon, report = resolve(pairs, merges, a.majority)
+    resolved, canon, report = resolve(pairs, merges, a.majority, a.max_rel_dist)
     print(f"raw lines {len(pairs)} | unique inputs after resolving {len(resolved)} "
           f"| canonical words {len(canon)}")
 
